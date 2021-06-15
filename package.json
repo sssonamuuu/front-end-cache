@@ -1,0 +1,60 @@
+{
+  "name": "front-end-cache",
+  "version": "1.0.0",
+  "description": "支持typescript的前端浏览器缓存，browser front end cache (支持localstorage, sessionstorage, cookie)",
+  "main": "index.js",
+  "typings": "src/index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sssonamuuu/front-end-cache.git"
+  },
+  "keywords": [
+    "typescript",
+    "ts",
+    "front end",
+    "cache",
+    "memory",
+    "storage",
+    "localstorage",
+    "sessionstorage",
+    "cookie",
+    "缓存",
+    "前端缓存",
+    "浏览器缓存"
+  ],
+  "files": [
+    "LICENSE",
+    "README.md",
+    "dist",
+    "src"
+  ],
+  "author": "sonamu.liao<liaoqingsong@front-end.com.cn>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sssonamuuu/front-end-cache/issues"
+  },
+  "homepage": "https://github.com/sssonamuuu/front-end-cache#readme",
+  "devDependencies": {
+    "@babel/core": "^7.14.5",
+    "@babel/plugin-transform-runtime": "^7.14.5",
+    "@babel/preset-env": "^7.14.5",
+    "@rollup/plugin-babel": "^5.3.0",
+    "@rollup/plugin-commonjs": "^19.0.0",
+    "@rollup/plugin-node-resolve": "^13.0.0",
+    "@rollup/plugin-typescript": "^8.2.1",
+    "@typescript-eslint/eslint-plugin": "^4.26.1",
+    "@typescript-eslint/parser": "^4.26.1",
+    "eslint": "^7.28.0",
+    "rollup": "^2.51.2",
+    "rollup-plugin-terser": "^7.0.2",
+    "rollup-plugin-uglify": "^6.0.4",
+    "tslib": "^2.3.0",
+    "typescript": "^4.3.2"
+  },
+  "dependencies": {
+    "core-js": "^3.14.0"
+  }
+}
