@@ -34,7 +34,7 @@ for (const type of ['cjs', 'umd']) {
     if (type === 'cjs') {
       item.exports = 'default';
     } else if (type === 'umd') {
-      item.name = pkg.name;
+      item.name = pkg.name.replace(/(^|-)([a-z])/g, (_, __, v) => v.toUpperCase());
     }
 
     output.push(item);
