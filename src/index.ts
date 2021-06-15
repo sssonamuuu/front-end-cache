@@ -2,7 +2,17 @@ export type FrontEndCacheType = 'localStorage' | 'sessionStorage' | 'cookie';
 
 export type FrontEndCacheExpiresUnit = 'years' | 'months' | 'days' | 'hours' | 'minutes' | 'seconds' | 'milliseconds';
 
-export interface SetItemOptions {
+export interface FrontEndCacheOptions<T = unknown> {
+
+  /**
+   * 同 `cookie` 的 `domain` 配置
+   *
+   * @see {@link https://developer.mozilla.org/zh-CN/docs/Web/API/Document/cookie}
+   *
+   * @default location.host
+   */
+  domain: string;
+
   /**
    * 同 `cookie` 的 `path` 配置
    *
@@ -12,16 +22,7 @@ export interface SetItemOptions {
    *
    * @default /
    */
-  path?: string;
-
-  /**
-   * 同 `cookie` 的 `domain` 配置
-   *
-   * @see {@link https://developer.mozilla.org/zh-CN/docs/Web/API/Document/cookie}
-   *
-   * @default location.host
-   */
-  domain?: string;
+  path: string;
 
   /**
    * 过期时间，默认单位 `milliseconds` ，可以通过 {@link SetItemOptions.expiresUnit} 配置
@@ -37,24 +38,39 @@ export interface SetItemOptions {
    *
    * @default milliseconds
    */
-  expiresUnit?: FrontEndCacheExpiresUnit;
+  expiresUnit: FrontEndCacheExpiresUnit;
 
   /**
    * 仅仅 `cookie` 有效，是否在传递时仅支持 `https`
    *
    * @default false
    */
-  secure?: boolean;
+  secure: boolean;
+
+  type: FrontEndCacheType;
+
+  /**
+   * 自定义序列化字 `value` 数据
+   *
+   * 默认/`true`：通过 `JSON.stringify` 序列化数据
+   *
+   * 如果为 `cookie` 还会通过 `encodeURIComponent` 一次 `JSON.stringify` 后的数据
+   *
+   * **仅在 `value` 类型为 `string` 的时候可以禁用序列化**，但同样会 `encodeURIComponent`
+   *
+   * 一般用在部分后端约定好的 `cookie` 时，后端未序列化时使用
+   */
+  serialize?: T extends string ? boolean : true;
+
+  /**
+   * 加密 `key` 的函数，
+   *
+   * 需要注意如果 `type = 'cookie'`, 最终的 `key` 也会 `encodeURIComponent`
+   */
+  encryKey?: (key: string) => string;
 }
 
-export interface SetItemOptionsWithValue<T> extends SetItemOptions {
-  value: T;
-}
-
-export interface FrontEndCacheOptions extends SetItemOptions {
-  type?: FrontEndCacheType;
-  encryKey?(key: string): string;
-}
+export type FrontEndStorageValue<T> = [value: T, domain: string, path: string, expires?: number];
 
 const expiresUnitFuncMap = {
   years: 'FullYear',
@@ -67,69 +83,117 @@ const expiresUnitFuncMap = {
 } as const;
 
 export default class FrontEndCache<T = unknown> {
-  static defaults: FrontEndCacheOptions = {
-    type: 'localStorage',
-    path: '/',
-    domain: location.host,
-    expiresUnit: 'milliseconds',
-    secure: false,
-  };
-
   private key: string;
 
-  private options: FrontEndCacheOptions;
+  private options: FrontEndCacheOptions<T>;
 
-  private get encryKey () {
-    return this.options.encryKey?.(this.key) || this.key;
+  constructor (key: string, options: Partial<FrontEndCacheOptions<T>> = {}) {
+    this.options = {
+      domain: location.host,
+      path: '/',
+      expiresUnit: 'milliseconds',
+      secure: false,
+      type: 'localStorage',
+      ...options,
+    };
+
+    this.key = this.options.encryKey?.(key) || key;
+
+    if (this.options.type === 'cookie') {
+      this.key = encodeURIComponent(key);
+    }
   }
 
-  /** 返回过期时间的时间戳 */
-  private getExpires (exp: number, expUnit: FrontEndCacheExpiresUnit = 'milliseconds'): number {
+  private get expiresTimeStamp (): number | null {
+    if (typeof this.options.expires !== 'number') {
+      return null;
+    }
+
     const now = new Date();
-    const fun = expiresUnitFuncMap[expUnit];
-    now[`get${fun}`](now[`get${fun}`] + exp);
+    const fun = expiresUnitFuncMap[this.options.expiresUnit];
+    now[`get${fun}`](now[`get${fun}`] + this.options.expires);
     return now.getTime();
   }
 
-  /** `options` 中与 `config` 中同字段配置其优先级更高 */
-  constructor (key: string, options?: FrontEndCacheOptions) {
-    this.key = key;
-    this.options = { ...FrontEndCache.defaults, ...options };
+  private serializeValue (value: unknown): string {
+    let _value;
+    if (this.options.serialize === false) {
+      _value = `${value}`;
+    } else {
+      _value = JSON.stringify(value);
+    }
+
+    /** `cookie` 始终进行一次 `encodeURIComponent` 避免特殊字符 */
+    if (this.options.type === 'cookie') {
+      _value = encodeURIComponent(_value);
+    }
+
+    return _value;
   }
 
-  private setCookie (option: SetItemOptionsWithValue<T>) {
-    const value = encodeURIComponent(JSON.stringify(option.value));
+  private deserialization<V> (value?: string | null): V | null {
+    try {
+      let _value: string = value ?? '';
 
-    let cookie = `${encodeURIComponent(this.encryKey)}=${value};`;
-    cookie += `path=${option.path || '/'};`;
-    cookie += `domain=${option.domain || location.host};`;
-    if (option.expires) {
-      cookie += `expires=${new Date(this.getExpires(option.expires, option.expiresUnit)).toUTCString()};`;
+      /** `cookie` 优先解码，然后直接返回 */
+      if (this.options.type === 'cookie') {
+        _value = decodeURIComponent(_value);
+      }
+
+      return this.options.serialize === false ? _value : JSON.parse(_value);
+    } catch {
+      return null;
+    }
+  }
+
+  private setCookie (value: T) {
+    let cookie = `${this.key}=${this.serializeValue(value)};`;
+    cookie += `path=${this.options.path};`;
+    cookie += `domain=${this.options.domain};`;
+
+    if (this.expiresTimeStamp) {
+      cookie += `expires=${new Date(this.expiresTimeStamp).toUTCString()};`;
     }
 
     document.cookie = cookie;
   }
 
-  private getCookie () {
-    return decodeURIComponent(document.cookie.replace(new RegExp(`(?:(?:^|.*;)\\s*${encodeURIComponent(this.encryKey).replace(/[-.+*]/g, '\\$&')}\\s*\\=\\s*([^;]*).*$)|^.*$`), '$1')) || null;
+  private getCookie (): T | null {
+    const value = document.cookie.replace(new RegExp(`(?:(?:^|.*;)\\s*${this.key.replace(/[-.+*]/g, '\\$&')}\\s*\\=\\s*([^;]*).*$)|^.*$`), '$1');
+    return this.deserialization<T>(value);
   }
 
   private removeCookie () {
-    document.cookie = `${encodeURIComponent(this.encryKey)}=; expires=Thu, 01 Jan 1970 00:00:00 GMT${sDomain ? `; domain=${sDomain}` : ''}${sPath ? `; path=${sPath}` : ''}`;
+    document.cookie = `${this.key}=; expires=Thu, 01 Jan 1970 00:00:00 GMT;domain=${this.options.domain};path=${this.options.path}`;
   }
 
-  setItem (options: SetItemOptionsWithValue<T>): T {
-    const _options = { ...this.options, ...options };
-    if (_options.type === 'cookie') {
-      this.setCookie(_options);
-      return _options.value;
+  setItem (value: T): T {
+    if (this.options.type === 'cookie') {
+      this.setCookie(value);
+      return value;
     }
 
-    return _options.type;
+    const _value: FrontEndStorageValue<T> = [value, this.options.domain, this.options.path];
+    this.expiresTimeStamp && (_value[3] = this.expiresTimeStamp);
+
+    window[this.options.type].setItem(this.key, this.serializeValue(_value));
+
+    return value;
   }
 
-  // removeItem () {
+  getItem (): T | null
+  getItem (defaultValue: T): T
+  getItem (defaultValue?: T): T | null {
+    if (this.options.type === 'cookie') {
+      return this.getCookie() ?? defaultValue ?? null;
+    }
 
-  // }
+    const value = this.deserialization<FrontEndStorageValue<T>>(window[this.options.type].getItem(this.key));
+    console.log(value);
+    return value?.[0] ?? defaultValue ?? null;
+  }
+
+  removeItem () {
+    this.removeCookie();
+  }
 }
-
