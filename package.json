@@ -1,7 +1,7 @@
 {
   "name": "front-end-cache",
-  "version": "1.0.0",
-  "description": "支持typescript的前端浏览器缓存，browser front end cache (支持localstorage, sessionstorage, cookie)",
+  "version": "1.0.1",
+  "description": "支持typescript的前端浏览器缓存管理工具，browser front end cache (支持localstorage, sessionstorage, cookie)",
   "main": "index.js",
   "typings": "src/index.ts",
   "scripts": {

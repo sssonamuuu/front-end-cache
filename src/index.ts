@@ -50,15 +50,13 @@ export interface FrontEndCacheOptions<T = unknown> {
   type: FrontEndCacheType;
 
   /**
-   * 自定义序列化字 `value` 数据
-   *
-   * 默认/`true`：通过 `JSON.stringify` 序列化数据
+   * 是否序通过 `JSON.stringify` 列化 `value` 数据
    *
    * 如果为 `cookie` 还会通过 `encodeURIComponent` 一次 `JSON.stringify` 后的数据
    *
-   * **仅在 `value` 类型为 `string` 的时候可以禁用序列化**，但同样会 `encodeURIComponent`
+   * **仅在 `value` 类型为 `string` 的时候可以禁用序列化**，但同样会调用 `encodeURIComponent`
    *
-   * 一般用在部分后端约定好的 `cookie` 时，后端未序列化时使用
+   * @default true
    */
   serialize?: T extends string ? boolean : true;
 
