@@ -1,15 +1,15 @@
 export type FrontEndCacheType = 'localStorage' | 'sessionStorage' | 'cookie';
 
-export type FrontEndCacheExpiresUnit = 'years' | 'months' | 'days' | 'hours' | 'minutes' | 'seconds' | 'milliseconds';
+export type FrontEndCacheExpiresUnit = 'years' | 'months' | 'days' | 'hours' | 'minutes' | 'seconds';
 
 export interface FrontEndCacheOptions<T = unknown> {
 
   /**
-   * 同 `cookie` 的 `domain` 配置
+   * 仅仅 `type=cookie`
    *
    * @see {@link https://developer.mozilla.org/zh-CN/docs/Web/API/Document/cookie}
    *
-   * @default location.host
+   * @default location.hostname
    */
   domain: string;
 
@@ -25,7 +25,7 @@ export interface FrontEndCacheOptions<T = unknown> {
   path: string;
 
   /**
-   * 过期时间，默认单位 `milliseconds` ，可以通过 {@link SetItemOptions.expiresUnit} 配置
+   * 过期时间，默认单位 `seconds` ，可以通过 {@link SetItemOptions.expiresUnit} 配置
    *
    * 针对 `sessionStorage` 和 `cookie` 默认值为当前会话
    *
@@ -36,12 +36,12 @@ export interface FrontEndCacheOptions<T = unknown> {
   /**
    * 过期时间单位
    *
-   * @default milliseconds
+   * @default seconds
    */
   expiresUnit: FrontEndCacheExpiresUnit;
 
   /**
-   * 仅仅 `cookie` 有效，是否在传递时仅支持 `https`
+   * 仅仅 `type=cookie`
    *
    * @default false
    */
@@ -70,7 +70,7 @@ export interface FrontEndCacheOptions<T = unknown> {
   encryKey?: (key: string) => string;
 }
 
-export type FrontEndStorageValue<T> = [value: T, domain: string, path: string, expires?: number];
+export type FrontEndStorageValue<T> = [value: T, path: string, expires?: number];
 
 const expiresUnitFuncMap = {
   years: 'FullYear',
@@ -79,7 +79,6 @@ const expiresUnitFuncMap = {
   hours: 'Hours',
   minutes: 'Minutes',
   seconds: 'Seconds',
-  milliseconds: 'Milliseconds',
 } as const;
 
 export default class FrontEndCache<T = unknown> {
@@ -89,9 +88,9 @@ export default class FrontEndCache<T = unknown> {
 
   constructor (key: string, options: Partial<FrontEndCacheOptions<T>> = {}) {
     this.options = {
-      domain: location.host,
+      domain: location.hostname,
       path: '/',
-      expiresUnit: 'milliseconds',
+      expiresUnit: 'seconds',
       secure: false,
       type: 'localStorage',
       ...options,
@@ -111,7 +110,7 @@ export default class FrontEndCache<T = unknown> {
 
     const now = new Date();
     const fun = expiresUnitFuncMap[this.options.expiresUnit];
-    now[`get${fun}`](now[`get${fun}`] + this.options.expires);
+    now[`set${fun}`](now[`get${fun}`]() + this.options.expires);
     return now.getTime();
   }
 
@@ -173,8 +172,8 @@ export default class FrontEndCache<T = unknown> {
       return value;
     }
 
-    const _value: FrontEndStorageValue<T> = [value, this.options.domain, this.options.path];
-    this.expiresTimeStamp && (_value[3] = this.expiresTimeStamp);
+    const _value: FrontEndStorageValue<T> = [value, this.options.path];
+    this.expiresTimeStamp && (_value[2] = this.expiresTimeStamp);
 
     window[this.options.type].setItem(this.key, this.serializeValue(_value));
 
@@ -184,16 +183,26 @@ export default class FrontEndCache<T = unknown> {
   getItem (): T | null
   getItem (defaultValue: T): T
   getItem (defaultValue?: T): T | null {
+    let _value: T | null = null;
+
     if (this.options.type === 'cookie') {
-      return this.getCookie() ?? defaultValue ?? null;
+      _value = this.getCookie();
+    } else {
+      const res = this.deserialization<FrontEndStorageValue<T>>(window[this.options.type].getItem(this.key));
+
+      if (res && location.pathname.startsWith(res[1]) && (!res[2] || new Date(res[2]).getTime() - Date.now() >= 0)) {
+        _value = res[0];
+      }
     }
 
-    const value = this.deserialization<FrontEndStorageValue<T>>(window[this.options.type].getItem(this.key));
-    console.log(value);
-    return value?.[0] ?? defaultValue ?? null;
+    return _value ?? defaultValue ?? null;
   }
 
   removeItem () {
-    this.removeCookie();
+    if (this.options.type === 'cookie') {
+      this.removeCookie();
+    } else {
+      window[this.options.type].removeItem(this.key);
+    }
   }
 }
