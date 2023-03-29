@@ -108,6 +108,7 @@ export default class FrontEndCache<T = unknown> {
 
     const now = new Date();
     const fun = expiresUnitFuncMap[this.options.expiresUnit];
+    // @ts-ignore
     now[`set${fun}`](now[`get${fun}`]() + this.options.expires);
     return now.getTime();
   }

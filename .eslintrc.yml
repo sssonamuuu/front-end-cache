@@ -12,7 +12,7 @@ parserOptions:
   ecmaFeatures:
     experimentalObjectRestSpread: true
 rules:
-  '@typescript-eslint/ban-ts-comment': 2
+  # '@typescript-eslint/ban-ts-comment': 2
   '@typescript-eslint/no-unused-vars':
     - 2
     - ignoreRestSiblings: true
